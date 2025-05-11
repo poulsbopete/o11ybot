@@ -291,8 +291,8 @@ class ElasticAnalyzer:
                 FROM {index}
                 | WHERE metricset.name == "system"
                 | STATS 
-                    avg_cpu = AVG(system.cpu.cores),
-                    avg_memory = AVG(system.memory.actual.used.pct)
+                    avg_cpu = AVG(`system.cpu.cores`),
+                    avg_memory = AVG(`system.memory.actual.used.pct`)
                     BY host.name
                 | SORT avg_cpu DESC
                 """
@@ -320,8 +320,8 @@ class ElasticAnalyzer:
                 FROM {index}
                 | WHERE metricset.name == "system"
                 | STATS 
-                    avg_memory_used = AVG(system.memory.actual.used.pct),
-                    avg_memory_free = AVG(system.memory.actual.free.pct)
+                    avg_memory_used = AVG(`system.memory.actual.used.pct`),
+                    avg_memory_free = AVG(`system.memory.actual.free.pct`)
                     BY host.name
                 | SORT avg_memory_used DESC
                 """
@@ -334,9 +334,9 @@ class ElasticAnalyzer:
                 FROM {index}
                 | WHERE metricset.name == "system"
                 | STATS 
-                    avg_disk_used = AVG(system.filesystem.used.pct),
-                    avg_disk_free = AVG(system.filesystem.free)
-                    BY host.name, system.filesystem.mount_point
+                    avg_disk_used = AVG(`system.filesystem.used.pct`),
+                    avg_disk_free = AVG(`system.filesystem.free`)
+                    BY host.name, `system.filesystem.mount_point`
                 | SORT avg_disk_used DESC
                 """
             })
