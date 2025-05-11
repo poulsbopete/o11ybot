@@ -11,18 +11,39 @@ This application connects to an Elastic Serverless observability instance and an
 
 ## Setup
 
-1. Create a `.env` file with your Elastic credentials:
+### 1. Create and Activate a Python Virtual Environment (macOS)
+
+1. **Install Python 3.11 (if not already installed):**
+   ```bash
+   brew install python@3.11
+   ```
+2. **Create a virtual environment:**
+   ```bash
+   /opt/homebrew/opt/python@3.11/bin/python3.11 -m venv venv
+   ```
+3. **Activate the virtual environment:**
+   ```bash
+   source venv/bin/activate
+   ```
+4. **Upgrade pip (recommended):**
+   ```bash
+   pip install --upgrade pip
+   ```
+
+### 2. Set up your Elastic credentials
+
+Create a `.env` file with your Elastic credentials:
 ```
 ELASTIC_URL=your_elastic_url
 ELASTIC_API_KEY=your_api_key
 ```
 
-2. Install dependencies:
+### 3. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the application:
+### 4. Run the application
 ```bash
 python main.py
 ```
@@ -37,6 +58,6 @@ The application will:
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.11+
 - Elastic Serverless observability instance
 - Valid Elastic API key with appropriate permissions 
