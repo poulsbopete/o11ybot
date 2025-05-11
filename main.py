@@ -7,23 +7,37 @@ import json
 import requests
 from urllib.parse import urljoin
 
-# Load environment variables
-load_dotenv()
+# Force reload environment variables
+load_dotenv(override=True)
 
 # Initialize Rich console for pretty output
 console = Console()
+
+# Set the correct values directly
+os.environ['ELASTIC_URL'] = 'https://otel-demo-a5630c.es.us-east-1.aws.elastic.cloud'
+os.environ['ELASTIC_API_KEY'] = 'ApiKey UHd2cXdKWUJ1aV9MRG9GdzAya206MFcwNVRfbkVhUjhIZ05hTEhtNnlzUQ=='
+
+# Debug: Print environment variables
+console.print("[yellow]Environment Variables:[/yellow]")
+console.print(f"ELASTIC_URL: {os.getenv('ELASTIC_URL')}")
+console.print(f"ELASTIC_API_KEY: {os.getenv('ELASTIC_API_KEY')[:20]}...")  # Only show first 20 chars for security
 
 class ElasticAnalyzer:
     def __init__(self):
         self.base_url = os.getenv('ELASTIC_URL')
         self.api_key = os.getenv('ELASTIC_API_KEY')
         
+        if not self.base_url or not self.api_key:
+            raise ValueError("ELASTIC_URL and ELASTIC_API_KEY must be set in .env file")
+        
+        console.print(f"[yellow]Attempting to connect to: {self.base_url}[/yellow]")
+        
         # Initialize Elasticsearch client with proper configuration
         self.es = Elasticsearch(
             self.base_url,
-            api_key=self.api_key,
+            headers={"Authorization": self.api_key},
             verify_certs=True,
-            timeout=30,
+            request_timeout=30,
             max_retries=3,
             retry_on_timeout=True
         )
@@ -32,30 +46,73 @@ class ElasticAnalyzer:
     def test_connection(self):
         """Test the connection to Elasticsearch"""
         try:
-            # Test basic connectivity
-            health = self.es.cluster.health()
-            self.console.print(f"[green]Successfully connected to Elasticsearch cluster: {health['cluster_name']}[/green]")
+            # Try a simple search query to test connection
+            response = requests.post(
+                f"{self.base_url}/logs-*/_search",
+                headers={
+                    "Authorization": self.api_key,
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "size": 0,
+                    "query": {
+                        "match_all": {}
+                    }
+                },
+                verify=True
+            )
+            self.console.print(f"[yellow]Direct HTTP response status: {response.status_code}[/yellow]")
+            if response.status_code != 200:
+                # Escape any special characters in the response text
+                error_text = response.text.replace('[', '\\[').replace(']', '\\]')
+                self.console.print(f"[yellow]Response content: {error_text}[/yellow]")
+                return False
+            
+            # If we get here, the connection is working
+            self.console.print("[green]Successfully connected to Elasticsearch serverless instance[/green]")
             return True
         except Exception as e:
-            self.console.print(f"[bold red]Error connecting to Elasticsearch: {str(e)}[/bold red]")
+            error_msg = str(e).replace('[', '\\[').replace(']', '\\]')
+            self.console.print(f"[bold red]Error connecting to Elasticsearch: {error_msg}[/bold red]")
+            self.console.print(f"[yellow]Please verify your ELASTIC_URL ({self.base_url}) and ELASTIC_API_KEY are correct[/yellow]")
             return False
 
     def get_apm_indices(self):
         """Get all APM-related indices"""
         try:
-            # First try to get indices using the standard pattern
-            indices = self.es.indices.get_alias(index="apm-*")
-            return list(indices.keys())
+            # Try to search in common APM index patterns
+            apm_patterns = [
+                "apm-*",
+                "traces-*",
+                "logs-*",
+                "metrics-*"
+            ]
+            
+            found_indices = set()
+            for pattern in apm_patterns:
+                response = requests.post(
+                    f"{self.base_url}/{pattern}/_search",
+                    headers={
+                        "Authorization": self.api_key,
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "size": 0,
+                        "query": {
+                            "match_all": {}
+                        }
+                    },
+                    verify=True
+                )
+                if response.status_code == 200:
+                    # Extract index name from response
+                    index_name = response.url.split('/')[-2]  # Get index name from URL
+                    found_indices.add(index_name)
+            
+            return list(found_indices)
         except Exception as e:
-            self.console.print(f"[yellow]Warning: Could not find APM indices using standard pattern: {str(e)}[/yellow]")
-            try:
-                # Try to get all indices and filter for APM-related ones
-                all_indices = self.es.indices.get_alias(index="*")
-                apm_indices = [idx for idx in all_indices.keys() if 'apm' in idx.lower() or 'otel' in idx.lower()]
-                return apm_indices
-            except Exception as e:
-                self.console.print(f"[bold red]Error getting indices: {str(e)}[/bold red]")
-                return []
+            self.console.print(f"[bold red]Error getting indices: {str(e)}[/bold red]")
+            return []
 
     def analyze_trace_data(self, index):
         """Analyze trace data in a specific index"""
@@ -190,7 +247,8 @@ class ElasticAnalyzer:
                     self.console.print(example['esql'])
                 
         except Exception as e:
-            self.console.print(f"[bold red]Error during analysis: {str(e)}[/bold red]")
+            error_msg = str(e).replace('[', '\\[').replace(']', '\\]')
+            self.console.print(f"[bold red]Error during analysis: {error_msg}[/bold red]")
 
 def main():
     analyzer = ElasticAnalyzer()
