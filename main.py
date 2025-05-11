@@ -136,7 +136,73 @@ class ElasticAnalyzer:
             self.console.print(f"[yellow]Warning: Could not analyze trace data for index {index}: {str(e)}[/yellow]")
             return []
 
-    def generate_esql_examples(self, index):
+    def inspect_fields(self, index):
+        """Inspect available fields in the index"""
+        try:
+            # Get a sample document to inspect fields
+            response = requests.post(
+                f"{self.base_url}/{index}/_search",
+                headers={
+                    "Authorization": self.api_key,
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "size": 1,
+                    "query": {
+                        "match_all": {}
+                    }
+                },
+                verify=True
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data['hits']['hits']:
+                    sample_doc = data['hits']['hits'][0]['_source']
+                    self.console.print("\n[yellow]Available fields in the index:[/yellow]")
+                    self.console.print(json.dumps(sample_doc, indent=2))
+                    return sample_doc
+            return None
+        except Exception as e:
+            self.console.print(f"[bold red]Error inspecting fields: {str(e)}[/bold red]")
+            return None
+
+    def run_analysis(self):
+        """Run the complete analysis"""
+        try:
+            # Test connection first
+            if not self.test_connection():
+                return
+
+            # Get APM indices
+            indices = self.get_apm_indices()
+            if not indices:
+                self.console.print("[yellow]No APM indices found. Make sure your OTEL data is being properly ingested.[/yellow]")
+                return
+
+            self.console.print(f"\n[bold green]Found {len(indices)} APM indices[/bold green]")
+            
+            for index in indices:
+                self.console.print(f"\n[bold blue]Analyzing index: {index}[/bold blue]")
+                
+                # First inspect the fields
+                sample_doc = self.inspect_fields(index)
+                if sample_doc:
+                    # Generate and display ESQL examples based on available fields
+                    examples = self.generate_esql_examples(index, sample_doc)
+                    
+                    for example in examples:
+                        self.console.print(f"\n[bold yellow]{example['title']}[/bold yellow]")
+                        self.console.print(f"[italic]{example['description']}[/italic]")
+                        self.console.print("[green]ESQL Example:[/green]")
+                        self.console.print(example['esql'])
+                else:
+                    self.console.print("[yellow]Could not inspect fields in this index[/yellow]")
+                
+        except Exception as e:
+            error_msg = str(e).replace('[', '\\[').replace(']', '\\]')
+            self.console.print(f"[bold red]Error during analysis: {error_msg}[/bold red]")
+
+    def generate_esql_examples(self, index, sample_doc=None):
         """Generate ESQL examples based on the data found"""
         examples = []
         
@@ -265,53 +331,6 @@ class ElasticAnalyzer:
         })
 
         return examples
-
-    def run_analysis(self):
-        """Run the complete analysis"""
-        try:
-            # Test connection first
-            if not self.test_connection():
-                return
-
-            # Get APM indices
-            indices = self.get_apm_indices()
-            if not indices:
-                self.console.print("[yellow]No APM indices found. Make sure your OTEL data is being properly ingested.[/yellow]")
-                return
-
-            self.console.print(f"\n[bold green]Found {len(indices)} APM indices[/bold green]")
-            
-            for index in indices:
-                self.console.print(f"\n[bold blue]Analyzing index: {index}[/bold blue]")
-                
-                # Analyze trace data
-                trace_data = self.analyze_trace_data(index)
-                
-                if trace_data:
-                    # Create a table for transaction types
-                    table = Table(title=f"Transaction Types in {index}")
-                    table.add_column("Type", style="cyan")
-                    table.add_column("Count", style="magenta")
-                    
-                    for bucket in trace_data:
-                        table.add_row(bucket['key'], str(bucket['doc_count']))
-                    
-                    self.console.print(table)
-                else:
-                    self.console.print("[yellow]No transaction data found in this index[/yellow]")
-                
-                # Generate and display ESQL examples
-                examples = self.generate_esql_examples(index)
-                
-                for example in examples:
-                    self.console.print(f"\n[bold yellow]{example['title']}[/bold yellow]")
-                    self.console.print(f"[italic]{example['description']}[/italic]")
-                    self.console.print("[green]ESQL Example:[/green]")
-                    self.console.print(example['esql'])
-                
-        except Exception as e:
-            error_msg = str(e).replace('[', '\\[').replace(']', '\\]')
-            self.console.print(f"[bold red]Error during analysis: {error_msg}[/bold red]")
 
 def main():
     analyzer = ElasticAnalyzer()
