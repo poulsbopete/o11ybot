@@ -291,7 +291,7 @@ class ElasticAnalyzer:
                 FROM {index}
                 | WHERE metricset.name == "system"
                 | STATS 
-                    avg_cpu = AVG(system.cpu.total.norm.pct),
+                    avg_cpu = AVG(system.cpu.cores),
                     avg_memory = AVG(system.memory.actual.used.pct)
                     BY host.name
                 | SORT avg_cpu DESC
@@ -299,30 +299,45 @@ class ElasticAnalyzer:
             })
 
             examples.append({
-                "title": "Process Metrics",
-                "description": "Analyze process metrics",
+                "title": "System Load Analysis",
+                "description": "Analyze system load metrics",
                 "esql": f"""
                 FROM {index}
-                | WHERE metricset.name == "process"
+                | WHERE metricset.name == "system"
                 | STATS 
-                    avg_cpu = AVG(process.cpu.total.norm.pct),
-                    avg_memory = AVG(process.memory.rss.bytes)
-                    BY process.name
-                | SORT avg_cpu DESC
+                    avg_load_1m = AVG(system.load.1),
+                    avg_load_5m = AVG(system.load.5),
+                    avg_load_15m = AVG(system.load.15)
+                    BY host.name
+                | SORT avg_load_1m DESC
                 """
             })
 
             examples.append({
-                "title": "JVM Metrics",
-                "description": "Analyze JVM metrics",
+                "title": "Memory Usage Analysis",
+                "description": "Analyze memory usage metrics",
                 "esql": f"""
                 FROM {index}
-                | WHERE metricset.name == "jvm"
+                | WHERE metricset.name == "system"
                 | STATS 
-                    avg_heap = AVG(jvm.memory.heap.used.pct),
-                    avg_gc = AVG(jvm.gc.old.collection.time)
-                    BY service.name
-                | SORT avg_heap DESC
+                    avg_memory_used = AVG(system.memory.actual.used.pct),
+                    avg_memory_free = AVG(system.memory.actual.free.pct)
+                    BY host.name
+                | SORT avg_memory_used DESC
+                """
+            })
+
+            examples.append({
+                "title": "Filesystem Analysis",
+                "description": "Analyze filesystem metrics",
+                "esql": f"""
+                FROM {index}
+                | WHERE metricset.name == "system"
+                | STATS 
+                    avg_disk_used = AVG(system.filesystem.used.pct),
+                    avg_disk_free = AVG(system.filesystem.free.pct)
+                    BY host.name, system.filesystem.mount_point
+                | SORT avg_disk_used DESC
                 """
             })
 
