@@ -208,11 +208,11 @@ class ElasticAnalyzer:
             "description": "Analyze transactions by geographic location",
             "esql": f"""
             FROM {index}
-            | WHERE client.geo.country_name IS NOT NULL
+            | WHERE client.geoip.country_name IS NOT NULL
             | STATS 
                 avg_duration = AVG(transaction.duration.us),
                 count = COUNT()
-                BY client.geo.country_name
+                BY client.geoip.country_name
             | SORT count DESC
             """
         })
@@ -224,6 +224,37 @@ class ElasticAnalyzer:
             "esql": f"""
             FROM {index}
             | WHERE transaction.type == "page-load"
+            | STATS 
+                avg_duration = AVG(transaction.duration.us),
+                p95_duration = PERCENTILE(transaction.duration.us, 95),
+                count = COUNT()
+                BY transaction.name
+            | SORT avg_duration DESC
+            """
+        })
+
+        # Example 7: Browser Analysis
+        examples.append({
+            "title": "Browser Analysis",
+            "description": "Analyze performance by browser",
+            "esql": f"""
+            FROM {index}
+            | WHERE user_agent.name IS NOT NULL
+            | STATS 
+                avg_duration = AVG(transaction.duration.us),
+                count = COUNT()
+                BY user_agent.name
+            | SORT count DESC
+            """
+        })
+
+        # Example 8: Response Time Analysis
+        examples.append({
+            "title": "Response Time Analysis",
+            "description": "Analyze response times by endpoint",
+            "esql": f"""
+            FROM {index}
+            | WHERE transaction.type == "request"
             | STATS 
                 avg_duration = AVG(transaction.duration.us),
                 p95_duration = PERCENTILE(transaction.duration.us, 95),
