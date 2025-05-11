@@ -140,63 +140,95 @@ class ElasticAnalyzer:
         """Generate ESQL examples based on the data found"""
         examples = []
         
-        # Example 1: Purchase Analysis
+        # Example 1: Transaction Duration Analysis
         examples.append({
-            "title": "Purchase Analysis",
-            "description": "Analyze purchase amounts and success rates",
+            "title": "Transaction Duration Analysis",
+            "description": "Analyze transaction durations by type",
             "esql": f"""
             FROM {index}
-            | WHERE transaction.type == "purchase"
+            | WHERE transaction.type IS NOT NULL
             | STATS 
-                avg_amount = AVG(transaction.amount),
-                success_rate = AVG(transaction.success),
+                avg_duration = AVG(transaction.duration.us),
+                p95_duration = PERCENTILE(transaction.duration.us, 95),
                 count = COUNT()
+                BY transaction.type
+            | SORT avg_duration DESC
+            """
+        })
+
+        # Example 2: Error Analysis
+        examples.append({
+            "title": "Error Analysis",
+            "description": "Analyze errors by transaction type",
+            "esql": f"""
+            FROM {index}
+            | WHERE transaction.result == "error"
+            | STATS 
+                error_count = COUNT(),
+                avg_duration = AVG(transaction.duration.us)
+                BY transaction.type
+            | SORT error_count DESC
+            """
+        })
+
+        # Example 3: Service Performance
+        examples.append({
+            "title": "Service Performance",
+            "description": "Analyze performance by service",
+            "esql": f"""
+            FROM {index}
+            | WHERE service.name IS NOT NULL
+            | STATS 
+                avg_duration = AVG(transaction.duration.us),
+                p95_duration = PERCENTILE(transaction.duration.us, 95),
+                count = COUNT()
+                BY service.name
+            | SORT avg_duration DESC
+            """
+        })
+
+        # Example 4: Span Analysis
+        examples.append({
+            "title": "Span Analysis",
+            "description": "Analyze spans by type and service",
+            "esql": f"""
+            FROM {index}
+            | WHERE span.type IS NOT NULL
+            | STATS 
+                avg_duration = AVG(span.duration.us),
+                count = COUNT()
+                BY span.type, service.name
+            | SORT avg_duration DESC
+            """
+        })
+
+        # Example 5: Geographic Distribution
+        examples.append({
+            "title": "Geographic Distribution",
+            "description": "Analyze transactions by geographic location",
+            "esql": f"""
+            FROM {index}
+            | WHERE client.geo.country_name IS NOT NULL
+            | STATS 
+                avg_duration = AVG(transaction.duration.us),
+                count = COUNT()
+                BY client.geo.country_name
             | SORT count DESC
             """
         })
 
-        # Example 2: Performance Metrics
+        # Example 6: User Experience Metrics
         examples.append({
-            "title": "Performance Metrics",
-            "description": "Analyze LCP and other performance metrics",
+            "title": "User Experience Metrics",
+            "description": "Analyze user experience metrics",
             "esql": f"""
             FROM {index}
             | WHERE transaction.type == "page-load"
             | STATS 
-                avg_lcp = AVG(transaction.lcp),
-                p95_lcp = PERCENTILE(transaction.lcp, 95),
+                avg_duration = AVG(transaction.duration.us),
+                p95_duration = PERCENTILE(transaction.duration.us, 95),
                 count = COUNT()
-            | SORT avg_lcp DESC
-            """
-        })
-
-        # Example 3: Geographic Analysis
-        examples.append({
-            "title": "Geographic Analysis",
-            "description": "Analyze user locations and performance by region",
-            "esql": f"""
-            FROM {index}
-            | WHERE transaction.type == "page-load"
-            | STATS 
-                avg_lcp = AVG(transaction.lcp),
-                count = COUNT()
-                BY geoip.country_name
-            | SORT avg_lcp DESC
-            """
-        })
-
-        # Example 4: OTEL-specific Analysis
-        examples.append({
-            "title": "OTEL Trace Analysis",
-            "description": "Analyze OpenTelemetry trace data",
-            "esql": f"""
-            FROM {index}
-            | WHERE span.kind == "server"
-            | STATS 
-                avg_duration = AVG(span.duration.us),
-                p95_duration = PERCENTILE(span.duration.us, 95),
-                count = COUNT()
-                BY service.name
+                BY transaction.name
             | SORT avg_duration DESC
             """
         })
