@@ -166,6 +166,82 @@ class ElasticAnalyzer:
             self.console.print(f"[bold red]Error inspecting fields: {str(e)}[/bold red]")
             return None
 
+    def analyze_metrics_data(self, index):
+        """Analyze metrics data in a specific index"""
+        try:
+            # First, let's see what metricset names are available
+            query = {
+                "size": 0,
+                "aggs": {
+                    "metricset_names": {
+                        "terms": {
+                            "field": "metricset.name",
+                            "size": 10
+                        }
+                    }
+                }
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/{index}/_search",
+                headers={
+                    "Authorization": self.api_key,
+                    "Content-Type": "application/json"
+                },
+                json=query,
+                verify=True
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'aggregations' in data:
+                    metricset_buckets = data['aggregations']['metricset_names']['buckets']
+                    if metricset_buckets:
+                        self.console.print("\n[yellow]Available metric sets:[/yellow]")
+                        table = Table(title="Metric Sets")
+                        table.add_column("Name", style="cyan")
+                        table.add_column("Count", style="magenta")
+                        
+                        for bucket in metricset_buckets:
+                            table.add_row(bucket['key'], str(bucket['doc_count']))
+                        
+                        self.console.print(table)
+                        
+                        # For each metricset, get a sample document to see available fields
+                        for bucket in metricset_buckets:
+                            metricset_name = bucket['key']
+                            sample_query = {
+                                "size": 1,
+                                "query": {
+                                    "term": {
+                                        "metricset.name": metricset_name
+                                    }
+                                }
+                            }
+                            
+                            sample_response = requests.post(
+                                f"{self.base_url}/{index}/_search",
+                                headers={
+                                    "Authorization": self.api_key,
+                                    "Content-Type": "application/json"
+                                },
+                                json=sample_query,
+                                verify=True
+                            )
+                            
+                            if sample_response.status_code == 200:
+                                sample_data = sample_response.json()
+                                if sample_data['hits']['hits']:
+                                    sample_doc = sample_data['hits']['hits'][0]['_source']
+                                    self.console.print(f"\n[yellow]Sample fields for {metricset_name}:[/yellow]")
+                                    self.console.print(json.dumps(sample_doc, indent=2))
+                    else:
+                        self.console.print("[yellow]No metric sets found in this index[/yellow]")
+            return True
+        except Exception as e:
+            self.console.print(f"[bold red]Error analyzing metrics data: {str(e)}[/bold red]")
+            return False
+
     def run_analysis(self):
         """Run the complete analysis"""
         try:
@@ -184,19 +260,18 @@ class ElasticAnalyzer:
             for index in indices:
                 self.console.print(f"\n[bold blue]Analyzing index: {index}[/bold blue]")
                 
-                # First inspect the fields
-                sample_doc = self.inspect_fields(index)
-                if sample_doc:
-                    # Generate and display ESQL examples based on available fields
-                    examples = self.generate_esql_examples(index, sample_doc)
-                    
-                    for example in examples:
-                        self.console.print(f"\n[bold yellow]{example['title']}[/bold yellow]")
-                        self.console.print(f"[italic]{example['description']}[/italic]")
-                        self.console.print("[green]ESQL Example:[/green]")
-                        self.console.print(example['esql'])
-                else:
-                    self.console.print("[yellow]Could not inspect fields in this index[/yellow]")
+                if 'metrics-' in index:
+                    # For metrics indices, analyze the metrics data
+                    self.analyze_metrics_data(index)
+                
+                # Generate and display ESQL examples
+                examples = self.generate_esql_examples(index)
+                
+                for example in examples:
+                    self.console.print(f"\n[bold yellow]{example['title']}[/bold yellow]")
+                    self.console.print(f"[italic]{example['description']}[/italic]")
+                    self.console.print("[green]ESQL Example:[/green]")
+                    self.console.print(example['esql'])
                 
         except Exception as e:
             error_msg = str(e).replace('[', '\\[').replace(']', '\\]')
