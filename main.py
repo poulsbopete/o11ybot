@@ -305,9 +305,9 @@ class ElasticAnalyzer:
                 FROM {index}
                 | WHERE metricset.name == "system"
                 | STATS 
-                    avg_load_1m = AVG(system.load.1),
-                    avg_load_5m = AVG(system.load.5),
-                    avg_load_15m = AVG(system.load.15)
+                    avg_load_1m = AVG(`system.load.1`),
+                    avg_load_5m = AVG(`system.load.5`),
+                    avg_load_15m = AVG(`system.load.15`)
                     BY host.name
                 | SORT avg_load_1m DESC
                 """
