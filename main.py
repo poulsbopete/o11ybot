@@ -206,129 +206,125 @@ class ElasticAnalyzer:
         """Generate ESQL examples based on the data found"""
         examples = []
         
-        # Example 1: Transaction Duration Analysis
-        examples.append({
-            "title": "Transaction Duration Analysis",
-            "description": "Analyze transaction durations by type",
-            "esql": f"""
-            FROM {index}
-            | WHERE transaction.type IS NOT NULL
-            | STATS 
-                avg_duration = AVG(transaction.duration.us),
-                p95_duration = PERCENTILE(transaction.duration.us, 95),
-                count = COUNT()
-                BY transaction.type
-            | SORT avg_duration DESC
-            """
-        })
+        # Check if this is a metrics index
+        if 'metrics-' in index:
+            # Metrics-specific examples
+            examples.append({
+                "title": "System Metrics Analysis",
+                "description": "Analyze system metrics over time",
+                "esql": f"""
+                FROM {index}
+                | WHERE metricset.name == "system"
+                | STATS 
+                    avg_cpu = AVG(system.cpu.total.norm.pct),
+                    avg_memory = AVG(system.memory.actual.used.pct)
+                    BY host.name
+                | SORT avg_cpu DESC
+                """
+            })
 
-        # Example 2: Error Analysis
-        examples.append({
-            "title": "Error Analysis",
-            "description": "Analyze errors by transaction type",
-            "esql": f"""
-            FROM {index}
-            | WHERE transaction.result == "error"
-            | STATS 
-                error_count = COUNT(),
-                avg_duration = AVG(transaction.duration.us)
-                BY transaction.type
-            | SORT error_count DESC
-            """
-        })
+            examples.append({
+                "title": "Process Metrics",
+                "description": "Analyze process metrics",
+                "esql": f"""
+                FROM {index}
+                | WHERE metricset.name == "process"
+                | STATS 
+                    avg_cpu = AVG(process.cpu.total.norm.pct),
+                    avg_memory = AVG(process.memory.rss.bytes)
+                    BY process.name
+                | SORT avg_cpu DESC
+                """
+            })
 
-        # Example 3: Service Performance
-        examples.append({
-            "title": "Service Performance",
-            "description": "Analyze performance by service",
-            "esql": f"""
-            FROM {index}
-            | WHERE service.name IS NOT NULL
-            | STATS 
-                avg_duration = AVG(transaction.duration.us),
-                p95_duration = PERCENTILE(transaction.duration.us, 95),
-                count = COUNT()
-                BY service.name
-            | SORT avg_duration DESC
-            """
-        })
+            examples.append({
+                "title": "JVM Metrics",
+                "description": "Analyze JVM metrics",
+                "esql": f"""
+                FROM {index}
+                | WHERE metricset.name == "jvm"
+                | STATS 
+                    avg_heap = AVG(jvm.memory.heap.used.pct),
+                    avg_gc = AVG(jvm.gc.old.collection.time)
+                    BY service.name
+                | SORT avg_heap DESC
+                """
+            })
 
-        # Example 4: Span Analysis
-        examples.append({
-            "title": "Span Analysis",
-            "description": "Analyze spans by type and service",
-            "esql": f"""
-            FROM {index}
-            | WHERE span.type IS NOT NULL
-            | STATS 
-                avg_duration = AVG(span.duration.us),
-                count = COUNT()
-                BY span.type, service.name
-            | SORT avg_duration DESC
-            """
-        })
+        else:
+            # Transaction and span analysis examples
+            examples.append({
+                "title": "Transaction Duration Analysis",
+                "description": "Analyze transaction durations by type",
+                "esql": f"""
+                FROM {index}
+                | WHERE transaction.type IS NOT NULL
+                | STATS 
+                    avg_duration = AVG(transaction.duration.us),
+                    p95_duration = PERCENTILE(transaction.duration.us, 95),
+                    count = COUNT()
+                    BY transaction.type
+                | SORT avg_duration DESC
+                """
+            })
 
-        # Example 5: Geographic Distribution
-        examples.append({
-            "title": "Geographic Distribution",
-            "description": "Analyze transactions by geographic location",
-            "esql": f"""
-            FROM {index}
-            | WHERE client.geoip.country_name IS NOT NULL
-            | STATS 
-                avg_duration = AVG(transaction.duration.us),
-                count = COUNT()
-                BY client.geoip.country_name
-            | SORT count DESC
-            """
-        })
+            examples.append({
+                "title": "Error Analysis",
+                "description": "Analyze errors by transaction type",
+                "esql": f"""
+                FROM {index}
+                | WHERE transaction.result == "error"
+                | STATS 
+                    error_count = COUNT(),
+                    avg_duration = AVG(transaction.duration.us)
+                    BY transaction.type
+                | SORT error_count DESC
+                """
+            })
 
-        # Example 6: User Experience Metrics
-        examples.append({
-            "title": "User Experience Metrics",
-            "description": "Analyze user experience metrics",
-            "esql": f"""
-            FROM {index}
-            | WHERE transaction.type == "page-load"
-            | STATS 
-                avg_duration = AVG(transaction.duration.us),
-                p95_duration = PERCENTILE(transaction.duration.us, 95),
-                count = COUNT()
-                BY transaction.name
-            | SORT avg_duration DESC
-            """
-        })
+            examples.append({
+                "title": "Service Performance",
+                "description": "Analyze performance by service",
+                "esql": f"""
+                FROM {index}
+                | WHERE service.name IS NOT NULL
+                | STATS 
+                    avg_duration = AVG(transaction.duration.us),
+                    p95_duration = PERCENTILE(transaction.duration.us, 95),
+                    count = COUNT()
+                    BY service.name
+                | SORT avg_duration DESC
+                """
+            })
 
-        # Example 7: Browser Analysis
-        examples.append({
-            "title": "Browser Analysis",
-            "description": "Analyze performance by browser",
-            "esql": f"""
-            FROM {index}
-            | WHERE user_agent.name IS NOT NULL
-            | STATS 
-                avg_duration = AVG(transaction.duration.us),
-                count = COUNT()
-                BY user_agent.name
-            | SORT count DESC
-            """
-        })
+            examples.append({
+                "title": "Span Analysis",
+                "description": "Analyze spans by type and service",
+                "esql": f"""
+                FROM {index}
+                | WHERE span.type IS NOT NULL
+                | STATS 
+                    avg_duration = AVG(span.duration.us),
+                    count = COUNT()
+                    BY span.type, service.name
+                | SORT avg_duration DESC
+                """
+            })
 
-        # Example 8: Response Time Analysis
-        examples.append({
-            "title": "Response Time Analysis",
-            "description": "Analyze response times by endpoint",
-            "esql": f"""
-            FROM {index}
-            | WHERE transaction.type == "request"
-            | STATS 
-                avg_duration = AVG(transaction.duration.us),
-                p95_duration = PERCENTILE(transaction.duration.us, 95),
-                count = COUNT()
-                BY transaction.name
-            | SORT avg_duration DESC
-            """
-        })
+            examples.append({
+                "title": "Response Time Analysis",
+                "description": "Analyze response times by endpoint",
+                "esql": f"""
+                FROM {index}
+                | WHERE transaction.type == "request"
+                | STATS 
+                    avg_duration = AVG(transaction.duration.us),
+                    p95_duration = PERCENTILE(transaction.duration.us, 95),
+                    count = COUNT()
+                    BY transaction.name
+                | SORT avg_duration DESC
+                """
+            })
 
         return examples
 
