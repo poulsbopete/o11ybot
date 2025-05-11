@@ -335,7 +335,7 @@ class ElasticAnalyzer:
                 | WHERE metricset.name == "system"
                 | STATS 
                     avg_disk_used = AVG(system.filesystem.used.pct),
-                    avg_disk_free = AVG(system.filesystem.free.pct)
+                    avg_disk_free = AVG(system.filesystem.free)
                     BY host.name, system.filesystem.mount_point
                 | SORT avg_disk_used DESC
                 """
